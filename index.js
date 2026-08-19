@@ -1,4 +1,3 @@
-
 const {
   Client,
   GatewayIntentBits,
@@ -22,6 +21,16 @@ const GUILD_ID = process.env.GUILD_ID;
 
 const SERVER_IP = process.env.SERVER_IP || "YourServerIP";
 const WELCOME_CHANNEL_ID = process.env.WELCOME_CHANNEL_ID;
+
+if (!TOKEN) {
+  console.error("❌ DISCORD_TOKEN is missing!");
+  process.exit(1);
+}
+
+if (!CLIENT_ID) {
+  console.error("❌ CLIENT_ID is missing!");
+  process.exit(1);
+}
 
 const commands = [
   new SlashCommandBuilder()
@@ -57,7 +66,6 @@ const commands = [
       option
         .setName("reason")
         .setDescription("Reason for kick")
-        .setRequired(false)
     )
     .setDefaultMemberPermissions(PermissionFlagsBits.KickMembers),
 
@@ -74,7 +82,6 @@ const commands = [
       option
         .setName("reason")
         .setDescription("Reason for ban")
-        .setRequired(false)
     )
     .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
 
@@ -122,22 +129,22 @@ async function registerCommands() {
         Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
         { body: commands }
       );
-      console.log("Guild commands registered!");
+      console.log("✅ Guild commands registered!");
     } else {
       await rest.put(
         Routes.applicationCommands(CLIENT_ID),
         { body: commands }
       );
-      console.log("Global commands registered!");
+      console.log("✅ Global commands registered!");
     }
   } catch (error) {
-    console.error("Command registration error:", error);
+    console.error("❌ Command registration error:", error);
   }
 }
 
 client.once("ready", () => {
-  console.log(`Logged in as ${client.user.tag}`);
-  console.log("nawazu_xd bot is online!");
+  console.log(`✅ Logged in as ${client.user.tag}`);
+  console.log("🤖 nawazu_xd bot is online!");
 
   client.user.setActivity("/help | Minecraft", {
     type: 0
@@ -148,15 +155,16 @@ client.on("guildMemberAdd", async member => {
   if (!WELCOME_CHANNEL_ID) return;
 
   const channel = member.guild.channels.cache.get(WELCOME_CHANNEL_ID);
+
   if (!channel) return;
 
   const embed = new EmbedBuilder()
     .setTitle("👋 Welcome!")
     .setDescription(
       `Welcome ${member} to **${member.guild.name}**!\n\n` +
-      `Enjoy the server and make sure to read the rules.`
+      "Enjoy the server and make sure to read the rules."
     )
-    .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+    .setThumbnail(member.user.displayAvatarURL())
     .setFooter({ text: "nawazu_xd Bot" })
     .setTimestamp();
 
@@ -187,9 +195,7 @@ client.on("interactionCreate", async interaction => {
     }
 
     if (interaction.commandName === "ping") {
-      return interaction.reply(
-        `🏓 Pong! **${client.ws.ping}ms**`
-      );
+      return interaction.reply(`🏓 Pong! **${client.ws.ping}ms**`);
     }
 
     if (interaction.commandName === "ip") {
@@ -202,7 +208,7 @@ client.on("interactionCreate", async interaction => {
       const embed = new EmbedBuilder()
         .setTitle("🖥️ Minecraft Server")
         .addFields(
-          { name: "🌐 IP", value: `\`${SERVER_IP}\``, inline: false },
+          { name: "🌐 IP", value: `\`${SERVER_IP}\`` },
           { name: "🤖 Bot", value: "Online", inline: true },
           { name: "📡 Ping", value: `${client.ws.ping}ms`, inline: true }
         )
@@ -259,4 +265,104 @@ client.on("interactionCreate", async interaction => {
       );
     }
 
-    if (interaction.commandName === "
+    if (interaction.commandName === "ban") {
+      const user = interaction.options.getUser("user");
+      const reason =
+        interaction.options.getString("reason") || "No reason provided";
+
+      const member = await interaction.guild.members
+        .fetch(user.id)
+        .catch(() => null);
+
+      if (!member) {
+        return interaction.reply({
+          content: "❌ Member not found.",
+          ephemeral: true
+        });
+      }
+
+      if (!member.bannable) {
+        return interaction.reply({
+          content: "❌ I cannot ban this member.",
+          ephemeral: true
+        });
+      }
+
+      await member.ban({ reason });
+
+      return interaction.reply(
+        `🔨 **${user.tag}** was banned.\nReason: ${reason}`
+      );
+    }
+
+    if (interaction.commandName === "timeout") {
+      const user = interaction.options.getUser("user");
+      const minutes = interaction.options.getInteger("minutes");
+
+      const member = await interaction.guild.members
+        .fetch(user.id)
+        .catch(() => null);
+
+      if (!member) {
+        return interaction.reply({
+          content: "❌ Member not found.",
+          ephemeral: true
+        });
+      }
+
+      if (!member.moderatable) {
+        return interaction.reply({
+          content: "❌ I cannot timeout this member.",
+          ephemeral: true
+        });
+      }
+
+      await member.timeout(
+        minutes * 60 * 1000,
+        `Timeout by ${interaction.user.tag}`
+      );
+
+      return interaction.reply(
+        `⏱️ **${user.tag}** was timed out for **${minutes} minutes**.`
+      );
+    }
+
+    if (interaction.commandName === "clear") {
+      const amount = interaction.options.getInteger("amount");
+
+      const deleted = await interaction.channel.bulkDelete(
+        amount,
+        true
+      );
+
+      return interaction.reply({
+        content: `🧹 Deleted **${deleted.size}** messages.`,
+        ephemeral: true
+      });
+    }
+  } catch (error) {
+    console.error("❌ Command error:", error);
+
+    if (interaction.replied || interaction.deferred) {
+      return interaction.followUp({
+        content: "❌ Something went wrong.",
+        ephemeral: true
+      });
+    }
+
+    return interaction.reply({
+      content: "❌ Something went wrong.",
+      ephemeral: true
+    });
+  }
+});
+
+async function startBot() {
+  await registerCommands();
+  await client.login(TOKEN);
+}
+
+startBot().catch(error => {
+  console.error("❌ Bot startup error:", error);
+  process.exit(1);
+});
