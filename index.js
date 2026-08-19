@@ -1,4 +1,4 @@
-MTUzOTU4MzY3MTUwODQwMjIzNg.G4a7ya.3RwCuj0dWnBy8fpPGctakX-z-5Dvbbnnx5J0tQ
+
 const {
   Client,
   GatewayIntentBits,
